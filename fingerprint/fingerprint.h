@@ -33,6 +33,7 @@ struct FingerprintState {
 	FprintDBusManager *manager;
 	GDBusConnection *connection;
 	FprintDBusDevice *device;
+	guint watch_id;
 	struct swaylock_state *sw_state;
 };
 

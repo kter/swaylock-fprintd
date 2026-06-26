@@ -162,6 +162,36 @@ static void proxy_signal_cb(GDBusProxy	*proxy,
 	verify_result(G_OBJECT (proxy), result, done, user_data);
 }
 
+static void drop_device(struct FingerprintState *state) {
+	if (state->device == NULL) {
+		return;
+	}
+	/* The daemon vanished (e.g. fprintd was restarted on resume), so the proxy
+	 * and any claim we held are dead. Drop the device WITHOUT calling Release:
+	 * the daemon is gone, so Release would only fail ("not claimed before use").
+	 * Nulling the device makes fingerprint_verify() re-open and re-claim against
+	 * the fresh daemon via its normal retry path. */
+	g_signal_handlers_disconnect_by_func(state->device, proxy_signal_cb, state);
+	g_clear_object(&state->device);
+	state->started = FALSE;
+	state->completed = FALSE;
+	state->match = FALSE;
+}
+
+static void fprintd_vanished_cb(GDBusConnection *connection, const gchar *name,
+								gpointer user_data) {
+	struct FingerprintState *state = user_data;
+	/* When we are not holding a claim the device is NULL and fprintd is free to
+	 * idle-deactivate; that name-vanish is normal, ignore it. A vanish while we
+	 * hold a claim means the daemon died under us (restart on resume) and our
+	 * proxy is stale - drop it so we re-claim instead of waiting forever. */
+	if (state->device == NULL) {
+		return;
+	}
+	swaylock_log(LOG_DEBUG, "fprintd vanished while claimed; dropping stale device to re-claim");
+	drop_device(state);
+}
+
 static void start_verify(struct FingerprintState *state) {
 	/* This one is funny. We connect to the signal immediately to avoid
 	 * race conditions. However, we must ignore any authentication results
@@ -202,6 +232,18 @@ void fingerprint_init(struct FingerprintState *fingerprint_state,
 	if(fingerprint_state->manager == NULL || fingerprint_state->connection == NULL) {
 		return;
 	}
+
+	/* Watch fprintd's bus name so we notice if the daemon restarts (the
+	 * resume hook restarts it on every wakeup). On vanish-while-claimed we drop
+	 * the now-dead device and the verify loop re-claims the fresh one. */
+	fingerprint_state->watch_id = g_bus_watch_name_on_connection(
+		fingerprint_state->connection,
+		"net.reactivated.Fprint",
+		G_BUS_NAME_WATCHER_FLAGS_NONE,
+		NULL,
+		fprintd_vanished_cb,
+		fingerprint_state,
+		NULL);
 }
 
 int fingerprint_verify(struct FingerprintState *fingerprint_state) {
@@ -240,6 +282,10 @@ int fingerprint_verify(struct FingerprintState *fingerprint_state) {
 }
 
 void fingerprint_deinit(struct FingerprintState *fingerprint_state) {
+	if (fingerprint_state->watch_id != 0) {
+		g_bus_unwatch_name(fingerprint_state->watch_id);
+		fingerprint_state->watch_id = 0;
+	}
 	if (!fingerprint_state->device) {
 		return;
 	}
