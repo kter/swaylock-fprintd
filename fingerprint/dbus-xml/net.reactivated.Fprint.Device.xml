@@ -1,0 +1,44 @@
+<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+<node><interface name="net.reactivated.Fprint.Device">
+    <method name="ListEnrolledFingers">
+      <arg type="s" name="username" direction="in" />
+      <arg type="as" name="enrolled_fingers" direction="out" />
+    </method>
+    <method name="DeleteEnrolledFingers">
+      <arg type="s" name="username" direction="in" />
+    </method>
+    <method name="DeleteEnrolledFingers2" />
+    <method name="DeleteEnrolledFinger">
+      <arg type="s" name="finger_name" direction="in" />
+    </method>
+    <method name="Claim">
+      <arg type="s" name="username" direction="in" />
+    </method>
+    <method name="Release" />
+    <method name="VerifyStart">
+      <arg type="s" name="finger_name" direction="in" />
+    </method>
+    <method name="VerifyStop" />
+    <method name="EnrollStart">
+      <arg type="s" name="finger_name" direction="in" />
+    </method>
+    <method name="EnrollStop" />
+    <signal name="VerifyFingerSelected">
+      <arg type="s" name="finger_name" />
+    </signal>
+    <signal name="VerifyStatus">
+      <arg type="s" name="result" />
+      <arg type="b" name="done" />
+    </signal>
+    <signal name="EnrollStatus">
+      <arg type="s" name="result" />
+      <arg type="b" name="done" />
+    </signal>
+    <property type="s" name="name" access="read" />
+    <property type="i" name="num-enroll-stages" access="read" />
+    <property type="s" name="scan-type" access="read" />
+    <property type="b" name="finger-present" access="read" />
+    <property type="b" name="finger-needed" access="read" />
+  </interface>
+</node>
