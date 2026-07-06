@@ -1,0 +1,6 @@
+#
+# PAM configuration for swaylock — password only (no fingerprint).
+#
+auth       include    password-auth
+account    include    password-auth
+session    include    password-auth

@@ -1,0 +1,22 @@
+[Unit]
+Description=Restart fprintd after resume to clear stale fingerprint device claims
+Documentation=https://github.com/SL-RU/swaylock-fprintd
+After=suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target
+
+[Service]
+Type=oneshot
+# A swaylock (before-sleep) holding the fprintd device across a suspend can
+# leave a stale claim after the USB reader re-enumerates on resume, blocking
+# all later fingerprint use until fprintd is restarted. Restarting it here
+# clears the claim; swaylock-fprintd re-claims within its 300ms retry loop.
+#
+# The USB reader needs a moment to re-enumerate on resume. Restarting fprintd
+# too early makes it bind the device while the bus is still settling, so the
+# running swaylock's retry loop grabs a transient claim that dies and never
+# re-claims (symptom: "Release ... Device was not claimed before use", and
+# fprintd idles out with no holder). Wait briefly before clearing the claim.
+ExecStartPre=/usr/bin/sleep 3
+ExecStart=/usr/bin/systemctl restart fprintd.service
+
+[Install]
+WantedBy=suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target
